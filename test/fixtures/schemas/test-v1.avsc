@@ -1,0 +1,13 @@
+{
+  "namespace": "org.vanbergen.test",
+  "name": "Test",
+  "doc": "Only used for testing",
+  "type": "record",
+  "fields": [
+    {
+      "type": "string",
+      "name": "data"
+    }
+  ],
+  "metafata_field": "present"
+}
