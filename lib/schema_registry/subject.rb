@@ -1,5 +1,20 @@
 module SchemaRegistry
 
+  class SchemaRegistration
+    attr_accessor :subject, :id, :version, :schema
+
+    def initialize(subject, options = {})
+      @subject = subject
+      @id      = options['id']
+      @version = options['version']
+      @schema  = options['schema']
+    end
+
+    def pretty_json
+      JSON.pretty_generate(JSON.parse(@schema))
+    end
+  end
+
   class Subject
     attr_reader :client, :name
 
@@ -12,15 +27,15 @@ module SchemaRegistry
     end
 
     def version(version)
-      client.request(:get, "/subjects/#{name}/versions/#{version}")
+      SchemaRegistration.new(self, client.request(:get, "/subjects/#{name}/versions/#{version}"))
     end
 
     def verify_schema(schema_json)
-      client.request(:post, "/subjects/#{name}", schema: schema_json)
+      SchemaRegistration.new(self, client.request(:post, "/subjects/#{name}", schema: schema_json))
     end
 
-    def update_schema(schema_json)
-      client.request(:post, "/subjects/#{name}/versions", schema: schema_json)["id"]
+    def register_schema(schema_json)
+      client.request(:post, "/subjects/#{name}/versions", schema: schema_json)['id']
     end
 
     def compatibility_level
@@ -29,7 +44,7 @@ module SchemaRegistry
     end
 
     def compatibility_level=(level)
-      response = client.request(:put, "/config/#{name}", compatibility: level)
+      client.request(:put, "/config/#{name}", compatibility: level)
     end
 
     def compatible?(schema, version = "latest")

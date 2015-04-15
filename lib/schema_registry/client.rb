@@ -11,6 +11,16 @@ module SchemaRegistry
     end
   end
 
+  RESPONSE_ERROR_CODES = {
+    40401 => (SubjectNotFound           = Class.new(SchemaRegistry::ResponseError)),
+    40402 => (VersionNotFound           = Class.new(SchemaRegistry::ResponseError)),
+    40403 => (SchemaNotFound            = Class.new(SchemaRegistry::ResponseError)),
+    42201 => (InvalidAvroSchema         = Class.new(SchemaRegistry::ResponseError)),
+    42202 => (InvalidVersion            = Class.new(SchemaRegistry::ResponseError)),
+    42203 => (InvalidCompatibilityLevel = Class.new(SchemaRegistry::ResponseError)),
+    409   => (IncompatibleAvroSchema    = Class.new(SchemaRegistry::ResponseError)),
+  }
+
   class Client
 
     attr_reader :endpoint, :username, :password
@@ -62,8 +72,11 @@ module SchemaRegistry
         response = http.request(request)
         response_data = JSON.parse(response.body)
         case response
-          when Net::HTTPOK; response_data
-          else raise SchemaRegistry::ResponseError.new(response_data['error_code'], response_data['message'])
+        when Net::HTTPSuccess;
+          response_data
+        else
+          error_class = RESPONSE_ERROR_CODES[response_data['error_code']] || SchemaRegistry::ResponseError
+          raise error_class.new(response_data['error_code'], response_data['message'])
         end
       end
     end
