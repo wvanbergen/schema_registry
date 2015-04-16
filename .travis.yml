@@ -10,10 +10,15 @@ env:
   global:
     SCHEMA_REGISTRY_URL: "http://localhost:8081"
 
+before_script:
+- make confluent/start
+
+after_script:
+- make confluent/stop
+
+before_cache:
+- rm -rf confluent/logs
+
 cache:
   directories:
   - confluent
-
-before_script:
-- make start
-
