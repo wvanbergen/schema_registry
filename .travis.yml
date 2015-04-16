@@ -1,0 +1,19 @@
+language: ruby
+sudo: false
+
+rvm:
+- "2.0"
+- "2.1"
+- "2.2"
+
+env:
+  global:
+    SCHEMA_REGISTRY_URL: "http://localhost:8081"
+
+cache:
+  directories:
+  - confluent
+
+before_script:
+- make start
+

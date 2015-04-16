@@ -3,8 +3,8 @@ require 'test_helper'
 class SchemaRegistryTest < Minitest::Test
 
   def setup
-    raise "The SCHEMA_REGISTRY_URI environment variable must be set" if ENV['SCHEMA_REGISTRY_URI'].nil?
-    @client = SchemaRegistry::Client.new(ENV['SCHEMA_REGISTRY_URI'])
+    registry_url = ENV['SCHEMA_REGISTRY_URL'] || "http://localhost:8081"
+    @client = SchemaRegistry::Client.new(registry_url)
   end
 
   def test_global_compatibility_level
@@ -23,14 +23,14 @@ class SchemaRegistryTest < Minitest::Test
     schema = schema_fixture('test', 1)
 
     subject = @client.subject('test.schema_registry')
-    schema_id = subject.update_schema(schema)
+    schema_id = subject.register_schema(schema)
     assert schema_id > 0
 
     assert_equal ['test.schema_registry'], @client.subjects.map(&:name)
 
     registered_schema = @client.schema(schema_id)
     schema_info = subject.verify_schema(schema)
-    assert_equal schema_id, schema_info['id']
+    assert_equal schema_id, schema_info.id
 
     assert_equal Avro::Schema.parse(schema), Avro::Schema.parse(registered_schema)
 
