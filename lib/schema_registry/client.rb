@@ -7,9 +7,11 @@ module SchemaRegistry
 
     def initialize(code, message)
       @code = code
-      super(message)
+      super("#{message} (error code #{code})")
     end
   end
+
+  InvalidResponse = Class.new(SchemaRegistry::Error)
 
   RESPONSE_ERROR_CODES = {
     40401 => (SubjectNotFound           = Class.new(SchemaRegistry::ResponseError)),
@@ -19,6 +21,7 @@ module SchemaRegistry
     42202 => (InvalidVersion            = Class.new(SchemaRegistry::ResponseError)),
     42203 => (InvalidCompatibilityLevel = Class.new(SchemaRegistry::ResponseError)),
     409   => (IncompatibleAvroSchema    = Class.new(SchemaRegistry::ResponseError)),
+    403   => (UnauthorizedRequest       = Class.new(SchemaRegistry::ResponseError)),
   }
 
   class Client
@@ -69,12 +72,25 @@ module SchemaRegistry
           request.body = JSON.dump(body)
         end
 
-        response = http.request(request)
-        response_data = JSON.parse(response.body)
-        case response
-        when Net::HTTPSuccess;
-          response_data
+        case response = http.request(request)
+        when Net::HTTPSuccess
+          begin
+            JSON.parse(response.body)
+          rescue JSON::ParserError => e
+            raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
+          end
+
+        when Net::HTTPForbidden
+          message = username.nil? ? "Unauthorized" : "User `#{username}` failed to authenticate"
+          raise SchemaRegistry::UnauthorizedRequest.new(response.code.to_i, message)
+
         else
+          response = begin
+            JSON.parse(response.body)
+          rescue JSON::ParserError => e
+            raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
+          end
+
           error_class = RESPONSE_ERROR_CODES[response_data['error_code']] || SchemaRegistry::ResponseError
           raise error_class.new(response_data['error_code'], response_data['message'])
         end

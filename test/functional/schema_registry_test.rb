@@ -9,10 +9,8 @@ class SchemaRegistryTest < Minitest::Test
 
   def test_global_compatibility_level
     old_level = @client.default_compatibility_level
-    assert_equal SchemaRegistry::Compatibility::BACKWARD, old_level
 
     @client.default_compatibility_level = SchemaRegistry::Compatibility::FULL
-
     current_level = @client.default_compatibility_level
     assert_equal current_level, SchemaRegistry::Compatibility::FULL
   ensure
