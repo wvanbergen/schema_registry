@@ -34,6 +34,13 @@ module SchemaRegistry
       SchemaRegistration.new(self, client.request(:post, "/subjects/#{name}", schema: schema_json))
     end
 
+    def schema_registered?(schema_json)
+      verify_schema(schema_json)
+      true
+    rescue SubjectNotFound, SchemaNotFound
+      false
+    end
+
     def register_schema(schema_json)
       client.request(:post, "/subjects/#{name}/versions", schema: schema_json)['id']
     end
