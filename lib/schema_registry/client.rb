@@ -85,7 +85,7 @@ module SchemaRegistry
           raise SchemaRegistry::UnauthorizedRequest.new(response.code.to_i, message)
 
         else
-          response = begin
+          response_data = begin
             JSON.parse(response.body)
           rescue JSON::ParserError => e
             raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
