@@ -12,6 +12,7 @@ module SchemaRegistry
   end
 
   InvalidResponse = Class.new(SchemaRegistry::Error)
+  ServerError = Class.new(SchemaRegistry::ResponseError)
 
   RESPONSE_ERROR_CODES = {
     40401 => (SubjectNotFound           = Class.new(SchemaRegistry::ResponseError)),
@@ -80,9 +81,13 @@ module SchemaRegistry
             raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
           end
 
+        when Net::HTTPInternalServerError
+          raise SchemaRegistry::ServerError, "Schema registy responded with a server error: #{esponse.code.to_i}"
+
         when Net::HTTPForbidden
           message = username.nil? ? "Unauthorized" : "User `#{username}` failed to authenticate"
           raise SchemaRegistry::UnauthorizedRequest.new(response.code.to_i, message)
+
 
         else
           response_data = begin
