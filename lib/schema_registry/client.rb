@@ -1,5 +1,6 @@
 require 'net/http'
 require 'json'
+require 'openssl'
 
 module SchemaRegistry
   class ResponseError < Error
@@ -27,11 +28,12 @@ module SchemaRegistry
 
   class Client
 
-    attr_reader :endpoint, :username, :password
+    attr_reader :endpoint, :username, :password, :http_options
 
-    def initialize(endpoint, username = nil, password = nil)
+    def initialize(endpoint, username = nil, password = nil, **http_options)
       @endpoint = URI(endpoint)
       @username, @password = username, password
+      @http_options = http_options
     end
 
     def schema(id)
@@ -55,8 +57,48 @@ module SchemaRegistry
       request(:put, "/config", compatibility: level)
     end
 
+    # Build options hash for net/http based on params provided. Primary for selectivly adding TLS config options for MTLS
+    def self.connection_options(**config)
+      options = {}
+
+      unless config[:verify_mode].nil?
+        options[:verify_mode] = OpenSSL::SSL.const_get(config[:verify_mode].upcase)
+      end
+
+      unless config[:ca_certificate].nil?
+        if File.exist?(config[:ca_certificate])
+          options[:ca_file] = config[:ca_certificate]
+        else
+          raise ArgumentError, "ca file not found [#{config[:ca_certificate]}]"
+        end
+      end
+
+      unless config[:client_key].nil?
+        if File.exist?(config[:client_key])
+          options[:key] = OpenSSL::PKey::RSA.new(File.read(config[:client_key]))
+        else
+          raise ArgumentError, "client key file not found [#{config[:client_key]}]"
+        end
+      end
+
+      unless config[:client_certificate].nil?
+        if File.exist?(config[:client_certificate])
+          options[:cert] = OpenSSL::X509::Certificate.new(File.read(config[:client_certificate]))
+        else
+          raise ArgumentError, "client cert file not found [#{config[:client_certificate]}]"
+        end
+      end
+      options
+    end
+
     def request(method, path, body = nil)
-      Net::HTTP.start(endpoint.host, endpoint.port, use_ssl: endpoint.scheme == 'https') do |http|
+
+      # build config for http client
+      default_options = {
+        use_ssl: endpoint.scheme == 'https'
+      }.merge!(@http_options)
+
+      Net::HTTP.start(endpoint.host, endpoint.port, default_options) do |http|
         request_class = case method
           when :get;    Net::HTTP::Get
           when :post;   Net::HTTP::Post
@@ -87,7 +129,6 @@ module SchemaRegistry
         when Net::HTTPForbidden
           message = username.nil? ? "Unauthorized" : "User `#{username}` failed to authenticate"
           raise SchemaRegistry::UnauthorizedRequest.new(response.code.to_i, message)
-
 
         else
           response_data = begin
