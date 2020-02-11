@@ -124,7 +124,7 @@ module SchemaRegistry
           end
 
         when Net::HTTPInternalServerError
-          raise SchemaRegistry::ServerError, "Schema registy responded with a server error: #{esponse.code.to_i}"
+          raise SchemaRegistry::ServerError, "Schema registy responded with a server error: #{response.code.to_i}"
 
         when Net::HTTPForbidden
           message = username.nil? ? "Unauthorized" : "User `#{username}` failed to authenticate"
