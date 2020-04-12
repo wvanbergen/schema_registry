@@ -107,7 +107,7 @@ module SchemaRegistry
           else raise ArgumentError, "Unsupported request method"
         end
 
-        request = request_class.new(path)
+        request = request_class.new(@endpoint.path + path)
         request.basic_auth(username, password) if username && password
         request['Accept'] = "application/vnd.schemaregistry.v1+json"
         if body

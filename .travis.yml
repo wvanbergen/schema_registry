@@ -1,24 +1,26 @@
 language: ruby
-sudo: false
+
+services:
+  - docker
 
 rvm:
-- "2.0"
-- "2.1"
-- "2.2"
+- "2.3"
+- "2.4"
+- "2.5"
+- "2.6"
+- "2.7"
 
-env:
-  global:
-    SCHEMA_REGISTRY_URL: "http://localhost:8081"
-
-before_script:
-- make confluent/start
-
-after_script:
-- make confluent/stop
-
-before_cache:
-- rm -rf confluent/logs
-
-cache:
-  directories:
-  - confluent
+before_install:
+  - docker run -d --name zookeeper -p 2181:2181 confluent/zookeeper
+  - while ! nc localhost 2181 </dev/null; do echo "Waiting for zookeeper..."; sleep 1; done
+  - docker run -d --name kafka -p 9092:9092 --link zookeeper:zookeeper confluent/kafka
+  - while ! nc localhost 9092 </dev/null; do echo "Waiting for Kafka..."; sleep 1; done
+  - docker run -d --name schema-registry -p 8081:8081 --link zookeeper:zookeeper --link kafka:kafka confluent/schema-registry
+  - while ! nc localhost 8081 </dev/null; do echo "Waiting for schema registry..."; sleep 1; done
+  - docker run -d --name rest-proxy -p 8082:8082 --link zookeeper:zookeeper --link kafka:kafka --link schema-registry:schema-registry confluent/rest-proxy
+  - while ! nc localhost 8082 </dev/null; do echo "Waiting for rest proxy..."; sleep 1; done
+  - docker run -d --name nginx -v $(pwd)/test/schema-registry.conf:/etc/nginx/conf.d/default.conf:ro -p 1081:1081 -p 1082:1082 --link schema-registry:schema-registry --link rest-proxy:rest-proxy nginx
+  - while ! nc localhost 1081 </dev/null; do echo "Waiting for nginx reverse proxy..."; sleep 1; done
+  - while ! nc localhost 1082 </dev/null; do echo "Waiting for nginx reverse proxy..."; sleep 1; done
+  - yes | gem update --system --force
+  - gem install bundler
