@@ -1,9 +1,9 @@
 require 'test_helper'
 
-class SchemaRegistryTest < Minitest::Test
+class SchemaRegistryTestReverseProxied < Minitest::Test
 
   def setup
-    registry_url = "http://localhost:8081"
+    registry_url = "http://localhost:1081/registry"
     @client = SchemaRegistry::Client.new(registry_url)
   end
 
