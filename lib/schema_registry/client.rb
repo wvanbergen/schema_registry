@@ -30,14 +30,22 @@ module SchemaRegistry
 
     attr_reader :endpoint, :username, :password, :http_options
 
-    def initialize(endpoint, username = nil, password = nil, **http_options)
+    def initialize(endpoint, username = nil, password = nil, flavour = "confluent", **http_options)
       @endpoint = URI(endpoint)
-      @username, @password = username, password
+      @username, @password, @flavour = username, password, flavour
       @http_options = http_options
+      if !["confluent", "apicurio"].include? flavour
+        raise ArgumentError, "flavour must be one of 'confluent' or 'apicurio'"
+      end
     end
 
     def schema(id)
-      request(:get, "/schemas/ids/#{id}")['schema']
+      if @flavour == "confluent"
+        request(:get, "/schemas/ids/#{id}")['schema']
+      elsif @flavour == "apicurio"
+        resp = request(:get, "/api/ids/#{id}")
+        return resp
+      end
     end
 
     def subjects
@@ -109,20 +117,28 @@ module SchemaRegistry
 
         request = request_class.new(@endpoint.path + path)
         request.basic_auth(username, password) if username && password
-        request['Accept'] = "application/vnd.schemaregistry.v1+json"
+        if @flavour == "confluent"
+          request['Accept'] = "application/vnd.schemaregistry.v1+json"
+        elsif @flavour == "apicurio"
+          request['Accept'] = "application/json"
+        end
         if body
           request['Content-Type'] = "application/json"
           request.body = JSON.dump(body)
         end
-
         case response = http.request(request)
+        when Net::HTTPOK
+          begin
+            JSON.parse(response.body)
+          rescue JSON::ParserError => e
+            raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
+          end
         when Net::HTTPSuccess
           begin
             JSON.parse(response.body)
           rescue JSON::ParserError => e
             raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
           end
-
         when Net::HTTPInternalServerError
           raise SchemaRegistry::ServerError, "Schema registy responded with a server error: #{response.code.to_i}"
 
@@ -136,7 +152,7 @@ module SchemaRegistry
           rescue JSON::ParserError => e
             raise SchemaRegistry::InvalidResponse, "Invalid JSON in response: #{e.message}"
           end
-
+        
           error_class = RESPONSE_ERROR_CODES[response_data['error_code']] || SchemaRegistry::ResponseError
           raise error_class.new(response_data['error_code'], response_data['message'])
         end
